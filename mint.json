@@ -54,7 +54,7 @@
   "navigation": [
     {
       "group": "Get Started",
-      "pages": ["introduction", "quickstart", "development","supported-formats", "input-nodes","explore-community"]
+      "pages": ["introduction", "quickstart", "development","index","supported-formats", "input-nodes","explore-community"]
     },
     {
       "group": "Essentials",
