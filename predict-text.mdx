@@ -1,0 +1,1380 @@
+# **Text**
+
+### Make predictions on text inputs
+
+---
+
+To get predictions for an input, you need to supply the text and the model you'd like to get predictions from. You can supply the text via a publicly accessible URL, a local text file, or in the raw format.
+
+The file size of each text input should be less than 20MB.
+
+You specify the model you'd like to use with the `MODEL_ID` parameter.
+
+## Predict via URL
+
+Below is an example of how you would make predictions on passages of text hosted on the web from the [`multilingual-uncased-sentiment`](https://clarifai.com/nlptownres/text-classification/models/multilingual-uncased-sentiment) model.
+
+<Info>The initialization code used in the following examples is outlined in detail on the [client installation page.](https://docs.clarifai.com/api-guide/api-overview/api-clients/#client-installation-instructions)</Info>
+
+
+<CodeGroup>
+
+```python Python
+######################################################################################################
+# In this section, we set the user authentication, user and app ID, model details, and the URL of 
+# the text we want as an input. Change these strings to run your own example.
+######################################################################################################
+
+# Your PAT (Personal Access Token) can be found in the portal under Authentification
+PAT = 'YOUR_PAT_HERE'
+# Specify the correct user_id/app_id pairings
+# Since you're making inferences outside your app's scope
+USER_ID = 'nlptownres'
+APP_ID = 'text-classification'
+# Change these to whatever model and text URL you want to use
+MODEL_ID = 'multilingual-uncased-sentiment'
+MODEL_VERSION_ID = '29d5fef0229a4936a607380d7ef775dd'
+TEXT_FILE_URL = 'https://samples.clarifai.com/negative_sentence_12.txt'
+
+############################################################################
+# YOU DO NOT NEED TO CHANGE ANYTHING BELOW THIS LINE TO RUN THIS EXAMPLE
+############################################################################
+
+from clarifai_grpc.channel.clarifai_channel import ClarifaiChannel
+from clarifai_grpc.grpc.api import resources_pb2, service_pb2, service_pb2_grpc
+from clarifai_grpc.grpc.api.status import status_code_pb2
+
+channel = ClarifaiChannel.get_grpc_channel()
+stub = service_pb2_grpc.V2Stub(channel)
+
+metadata = (('authorization', 'Key ' + PAT),)
+
+userDataObject = resources_pb2.UserAppIDSet(user_id=USER_ID, app_id=APP_ID)
+
+post_model_outputs_response = stub.PostModelOutputs(
+    service_pb2.PostModelOutputsRequest(
+        user_app_id=userDataObject,  # The userDataObject is created in the overview and is required when using a PAT
+        model_id=MODEL_ID,
+        version_id=MODEL_VERSION_ID,  # This is optional. Defaults to the latest model version
+        inputs=[
+            resources_pb2.Input(
+                data=resources_pb2.Data(
+                    text=resources_pb2.Text(
+                        url=TEXT_FILE_URL
+                    )
+                )
+            )
+        ]
+    ),
+    metadata=metadata
+)
+if post_model_outputs_response.status.code != status_code_pb2.SUCCESS:
+    print(post_model_outputs_response.status)
+    raise Exception("Post model outputs failed, status: " + post_model_outputs_response.status.description)
+
+# Since we have one input, one output will exist here
+output = post_model_outputs_response.outputs[0]
+
+print("Predicted concepts:")
+for concept in output.data.concepts:
+    print("%s %.2f" % (concept.name, concept.value))
+
+# Uncomment this line to print the full Response JSON
+#print(output)
+```
+
+```javascript JavaScript (REST) 
+<!--index.html file-->
+
+<script>
+    ////////////////////////////////////////////////////////////////////////////////////////////////////
+    // In this section, we set the user authentication, user and app ID, model details, and the URL
+    // of the text we want as an input. Change these strings to run your own example.
+    ///////////////////////////////////////////////////////////////////////////////////////////////////
+
+    // Your PAT (Personal Access Token) can be found in the portal under Authentification
+    const PAT = 'YOUR_PAT_HERE';
+    // Specify the correct user_id/app_id pairings
+    // Since you're making inferences outside your app's scope
+    const USER_ID = 'nlptownres';    
+    const APP_ID = 'text-classification';
+    // Change these to whatever model and text URL you want to use
+    const MODEL_ID = 'multilingual-uncased-sentiment';
+    const MODEL_VERSION_ID = '29d5fef0229a4936a607380d7ef775dd';    
+    const TEXT_FILE_URL = 'https://samples.clarifai.com/negative_sentence_12.txt';
+
+    ///////////////////////////////////////////////////////////////////////////////////
+    // YOU DO NOT NEED TO CHANGE ANYTHING BELOW THIS LINE TO RUN THIS EXAMPLE
+    ///////////////////////////////////////////////////////////////////////////////////
+
+    const raw = JSON.stringify({
+        "user_app_id": {
+            "user_id": USER_ID,
+            "app_id": APP_ID
+        },
+        "inputs": [
+            {
+                "data": {
+                    "text": {
+                        "url": TEXT_FILE_URL
+                    }
+                }
+            }
+        ]
+    });
+
+    const requestOptions = {
+        method: 'POST',
+        headers: {
+            'Accept': 'application/json',
+            'Authorization': 'Key ' + PAT
+        },
+        body: raw
+    };
+
+    // NOTE: MODEL_VERSION_ID is optional, you can also call prediction with the MODEL_ID only
+    // https://api.clarifai.com/v2/models/{YOUR_MODEL_ID}/outputs
+    // this will default to the latest version_id
+
+    fetch("https://api.clarifai.com/v2/models/" + MODEL_ID + "/versions/" + MODEL_VERSION_ID + "/outputs", requestOptions)
+        .then(response => response.text())
+        .then(result => console.log(result))
+        .catch(error => console.log('error', error));
+</script>
+```
+
+```nodejs NodeJs
+//index.js file
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////
+// In this section, we set the user authentication, user and app ID, model details, and the location
+// of the text we want as an input. Change these strings to run your own example.
+/////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// Your PAT (Personal Access Token) can be found in the portal under Authentification
+const PAT = 'YOUR_PAT_HERE';
+// Specify the correct user_id/app_id pairings
+// Since you're making inferences outside your app's scope
+const USER_ID = 'nlptownres';
+const APP_ID = 'text-classification';
+// Change these to whatever model and text input you want to use
+const MODEL_ID = 'multilingual-uncased-sentiment';
+const MODEL_VERSION_ID = '29d5fef0229a4936a607380d7ef775dd';
+const TEXT_FILE_LOCATION = 'YOUR_TEXT_FILE_LOCATION_HERE';
+
+///////////////////////////////////////////////////////////////////////////////////
+// YOU DO NOT NEED TO CHANGE ANYTHING BELOW THIS LINE TO RUN THIS EXAMPLE
+///////////////////////////////////////////////////////////////////////////////////
+
+const { ClarifaiStub, grpc } = require("clarifai-nodejs-grpc");
+
+const stub = ClarifaiStub.grpc();
+
+// This will be used by every Clarifai endpoint call
+const metadata = new grpc.Metadata();
+metadata.set("authorization", "Key " + PAT);
+
+const fs = require("fs");
+const fileBytes = fs.readFileSync(TEXT_FILE_LOCATION);
+
+stub.PostModelOutputs(
+    {
+        user_app_id: {
+            "user_id": USER_ID,
+            "app_id": APP_ID
+        },
+        model_id: MODEL_ID,
+        version_id: MODEL_VERSION_ID, // This is optional. Defaults to the latest model version
+        inputs: [
+            { data: { text: { raw: fileBytes } } }
+        ]
+    },
+    metadata,
+    (err, response) => {
+        if (err) {
+            throw new Error(err);
+        }
+
+        if (response.status.code !== 10000) {
+            throw new Error("Post model outputs failed, status: " + response.status.description);
+        }
+
+        // Since we have one input, one output will exist here
+        const output = response.outputs[0];
+
+        console.log("Predicted concepts:");
+        for (const concept of output.data.concepts) {
+            console.log(concept.name + " " + concept.value);
+        }
+    }
+
+);
+```
+
+```java Java
+package com.clarifai.example;
+
+import com.clarifai.grpc.api.*;
+import com.clarifai.channel.ClarifaiChannel;
+import com.clarifai.credentials.ClarifaiCallCredentials;
+import com.clarifai.grpc.api.status.StatusCode;
+import com.google.protobuf.ByteString;
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+
+public class ClarifaiExample {
+
+    /////////////////////////////////////////////////////////////////////////////////////////////////////////
+    // In this section, we set the user authentication, user and app ID, model details, and the location
+    // of the text we want as an input. Change these strings to run your own example.
+    /////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    //Your PAT (Personal Access Token) can be found in the portal under Authentication
+    static final String PAT = "YOUR_PAT_HERE";
+    // Specify the correct user_id/app_id pairings
+    // Since you're making inferences outside your app's scope
+    static final String USER_ID = "nlptownres";    
+    static final String APP_ID = "text-classification";
+    // Change these to whatever model and text input you want to use
+    static final String MODEL_ID = "multilingual-uncased-sentiment"; 
+     static final String MODEL_VERSION_ID = "29d5fef0229a4936a607380d7ef775dd";   
+    static final String TEXT_FILE_LOCATION = "YOUR_TEXT_FILE_LOCATION_HERE";
+   
+    ///////////////////////////////////////////////////////////////////////////////////
+    // YOU DO NOT NEED TO CHANGE ANYTHING BELOW THIS LINE TO RUN THIS EXAMPLE
+    ///////////////////////////////////////////////////////////////////////////////////	
+
+    public static void main(String[] args) throws IOException {
+
+        V2Grpc.V2BlockingStub stub = V2Grpc.newBlockingStub(ClarifaiChannel.INSTANCE.getGrpcChannel())
+            .withCallCredentials(new ClarifaiCallCredentials(PAT));
+
+        MultiOutputResponse postModelOutputsResponse = stub.postModelOutputs(
+            PostModelOutputsRequest.newBuilder()
+            .setUserAppId(UserAppIDSet.newBuilder().setUserId(USER_ID).setAppId(APP_ID))
+            .setModelId(MODEL_ID)
+            .setVersionId(MODEL_VERSION_ID) // This is optional. Defaults to the latest model version
+            .addInputs(
+                Input.newBuilder().setData(
+                    Data.newBuilder().setText(
+                        Text.newBuilder()
+                        .setRawBytes(ByteString.copyFrom(Files.readAllBytes(
+                            new File(TEXT_FILE_LOCATION).toPath()
+                        )))
+                    )
+                )
+            )
+            .build()
+        );
+
+        if (postModelOutputsResponse.getStatus().getCode() != StatusCode.SUCCESS) {
+            throw new RuntimeException("Post model outputs failed, status: " + postModelOutputsResponse.getStatus());
+        }
+
+        // Since we have one input, one output will exist here
+        Output output = postModelOutputsResponse.getOutputs(0);
+
+        System.out.println("Predicted concepts:");
+        for (Concept concept: output.getData().getConceptsList()) {
+            System.out.printf("%s %.2f%n", concept.getName(), concept.getValue());
+        }
+
+    }
+
+}
+```
+
+```php PHP
+<?php
+
+require __DIR__ . '/vendor/autoload.php';
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////
+// In this section, we set the user authentication, user and app ID, model details, and the location
+// of the text we want as an input. Change these strings to run your own example.
+////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// Your PAT (Personal Access Token) can be found in the portal under Authentification
+$PAT = 'YOUR_PAT_HERE';
+// Specify the correct user_id/app_id pairings
+// Since you're making inferences outside your app's scope
+$USER_ID = 'nlptownres';
+$APP_ID = 'text-classification';
+// Change these to whatever model and text URL you want to use
+$MODEL_ID = 'multilingual-uncased-sentiment';
+$MODEL_VERSION_ID = '29d5fef0229a4936a607380d7ef775dd';
+$TEXT_FILE_LOCATION = 'YOUR_TEXT_FILE_LOCATION_HERE';
+
+///////////////////////////////////////////////////////////////////////////////////
+// YOU DO NOT NEED TO CHANGE ANYTHING BELOW THIS LINE TO RUN THIS EXAMPLE
+///////////////////////////////////////////////////////////////////////////////////
+
+use Clarifai\ClarifaiClient;
+use Clarifai\Api\Data;
+use Clarifai\Api\Text;
+use Clarifai\Api\Input;
+use Clarifai\Api\PostModelOutputsRequest;
+use Clarifai\Api\Status\StatusCode;
+use Clarifai\Api\UserAppIDSet;
+
+$client = ClarifaiClient::grpc();
+
+$metadata = ['Authorization' => ['Key ' . $PAT ]];
+
+$userDataObject = new UserAppIDSet([
+    'user_id' => $USER_ID, 
+    'app_id' => $APP_ID 
+]);
+
+$textData = file_get_contents($TEXT_FILE_LOCATION); // Get the text bytes data from the location
+
+// Let's make a RPC call to the Clarifai platform. It uses the opened gRPC client channel to communicate a
+// request and then wait for the response
+[$response, $status] = $client->PostModelOutputs(
+    // The request object carries the request along with the request status and other metadata related to the request itself
+    new PostModelOutputsRequest([
+        'user_app_id' => $userDataObject,
+        'model_id' => $MODEL_ID,  
+        'version_id' => $MODEL_VERSION_ID, // This is optional. Defaults to the latest model version
+        'inputs' => [
+            new Input([ // The Input object wraps the Data object in order to meet the API specification                
+                'data' => new Data([ // The Data object is constructed around the Text object. It offers a container that has additional text independent
+                                    // metadata. In this particular use case, no other metadata is needed to be specified
+                    'text' => new Text([ // In the Clarifai platform, a text is defined by a special Text object
+                        'raw' => $textData 
+                    ])
+                ])
+            ])
+        ]        
+    ]),
+    $metadata
+)->wait();
+
+// A response is returned and the first thing we do is check the status of it
+// A successful response will have a status code of 0; otherwise, there is some error
+if ($status->code !== 0) {
+    throw new Exception("Error: {$status->details}");
+}
+
+// In addition to the RPC response status, there is a Clarifai API status that reports if the operation was a success or failure 
+// (not just that the communication was successful)
+if ($response->getStatus()->getCode() != StatusCode::SUCCESS) {
+    throw new Exception("Failure response: " . $response->getStatus()->getDescription() . " " .
+        $response->getStatus()->getDetails());
+}
+
+// The output of a successful call can be used in many ways. In this example, we loop through all of the predicted concepts and print them out along with
+// their numerical prediction value (confidence)
+echo "Predicted concepts: </br>";
+foreach ($response->getOutputs()[0]->getData()->getConcepts() as $concept) {
+    echo $concept->getName() . ": " . number_format($concept->getValue(), 2) . "</br>";
+}
+
+?>
+```
+
+```curl cURL
+# Smaller files (195 KB or less)
+
+curl -X POST "https://api.clarifai.com/v2/users/nlptownres/apps/text-classification/models/multilingual-uncased-sentiment/versions/29d5fef0229a4936a607380d7ef775dd/outputs" \
+    -H "Authorization: Key YOUR_PAT_HERE" \
+    -H "Content-Type: application/json" \
+    -d '{
+      "inputs": [
+        {
+          "data": {
+            "text": {
+              "raw": "YOUR_TEXT_FILE_BYTES_HERE"
+            }
+          }
+        }
+      ]
+    }'
+   
+```
+
+</CodeGroup>
+
+<Accordion title="Code Output Example">
+```
+Predicted concepts:
+3-stars 0.25
+2-stars 0.23
+1-star 0.20
+4-stars 0.17
+5-stars 0.14
+```
+</Accordion>
+
+
+<Accordion title="JSON Output Example">
+
+```json
+Predicted concepts:
+id: "9b7efc5d5e3d4d8da20faad4dc35dd8a"
+status {
+  code: SUCCESS
+  description: "Ok"
+}
+created_at {
+  seconds: 1676382425
+  nanos: 572796576
+}
+model {
+  id: "multilingual-uncased-sentiment"
+  name: "multilingual-uncased-sentiment"
+  created_at {
+    seconds: 1656469244
+    nanos: 44961000
+  }
+  app_id: "text-classification"
+  model_version {
+    id: "29d5fef0229a4936a607380d7ef775dd"
+    created_at {
+      seconds: 1656469244
+      nanos: 60443000
+    }
+    status {
+      code: MODEL_TRAINED
+      description: "Model is trained and ready"
+    }
+    visibility {
+      gettable: PUBLIC
+    }
+    app_id: "text-classification"
+    user_id: "nlptownres"
+    metadata {
+      fields {
+        key: "Model version logs zipped"
+        value {
+          string_value: "https://s3.amazonaws.com/clarifai-temp/prod/29d5fef0229a4936a607380d7ef775dd.zip"
+        }
+      }
+    }
+  }
+  user_id: "nlptownres"
+  model_type_id: "text-classifier"
+  visibility {
+    gettable: PUBLIC
+  }
+  modified_at {
+    seconds: 1661364520
+    nanos: 417454000
+  }
+  task: "text-classification"
+  presets {
+  }
+  workflow_recommended {
+  }
+}
+input {
+  id: "09633b75b0864a2792e635c5aa098614"
+  data {
+    text {
+      raw: "I love your product very much"
+      url: "https://samples.clarifai.com/placeholder.gif"
+    }
+  }
+}
+data {
+  concepts {
+    id: "5-stars"
+    name: "5-stars"
+    value: 0.866517961025238
+    app_id: "text-classification"
+  }
+  concepts {
+    id: "4-stars"
+    name: "4-stars"
+    value: 0.11985278874635696
+    app_id: "text-classification"
+  }
+  concepts {
+    id: "3-stars"
+    name: "3-stars"
+    value: 0.009703087620437145
+    app_id: "text-classification"
+  }
+  concepts {
+    id: "1-star"
+    name: "1-star"
+    value: 0.0020059270318597555
+    app_id: "text-classification"
+  }
+  concepts {
+    id: "2-stars"
+    name: "2-stars"
+    value: 0.001920199254527688
+    app_id: "text-classification"
+  }
+}
+```
+</Accordion>
+
+
+## Predict via Local Files
+Below is an example of how you would provide text inputs via local text files and receive predictions from the [`multilingual-uncased-sentiment`](https://clarifai.com/nlptownres/text-classification/models/multilingual-uncased-sentiment) model.
+
+<CodeGroup>
+
+```python Python
+#######################################################################################################
+# In this section, we set the user authentication, user and app ID, model details, and the location
+# of the text we want as an input. Change these strings to run your own example.    
+#######################################################################################################
+
+# Your PAT (Personal Access Token) can be found in the portal under Authentification
+PAT = 'YOUR_PAT_HERE'
+# Specify the correct user_id/app_id pairings
+# Since you're making inferences outside your app's scope
+USER_ID = 'nlptownres'
+APP_ID = 'text-classification'
+# Change these to whatever model and text input you want to use
+MODEL_ID = 'multilingual-uncased-sentiment'
+MODEL_VERSION_ID = '29d5fef0229a4936a607380d7ef775dd'
+TEXT_FILE_LOCATION = 'YOUR_TEXT_FILE_LOCATION_HERE'
+
+############################################################################
+# YOU DO NOT NEED TO CHANGE ANYTHING BELOW THIS LINE TO RUN THIS EXAMPLE
+############################################################################
+
+from clarifai_grpc.channel.clarifai_channel import ClarifaiChannel
+from clarifai_grpc.grpc.api import resources_pb2, service_pb2, service_pb2_grpc
+from clarifai_grpc.grpc.api.status import status_code_pb2
+
+channel = ClarifaiChannel.get_grpc_channel()
+stub = service_pb2_grpc.V2Stub(channel)
+
+metadata = (('authorization', 'Key ' + PAT),)
+
+userDataObject = resources_pb2.UserAppIDSet(user_id=USER_ID, app_id=APP_ID)
+
+with open(TEXT_FILE_LOCATION, "rb") as f:
+    file_bytes = f.read()
+
+post_model_outputs_response = stub.PostModelOutputs(
+    service_pb2.PostModelOutputsRequest(
+        user_app_id=userDataObject,  # The userDataObject is created in the overview and is required when using a PAT
+        model_id=MODEL_ID,
+        version_id=MODEL_VERSION_ID,  # This is optional. Defaults to the latest model version
+        inputs=[
+            resources_pb2.Input(
+                data=resources_pb2.Data(
+                    text=resources_pb2.Text(
+                        raw=file_bytes
+                    )
+                )
+            )
+        ]
+    ),
+    metadata=metadata
+)
+if post_model_outputs_response.status.code != status_code_pb2.SUCCESS:
+    print(post_model_outputs_response.status)
+    raise Exception("Post model outputs failed, status: " + post_model_outputs_response.status.description)
+
+# Since we have one input, one output will exist here.
+output = post_model_outputs_response.outputs[0]
+
+print("Predicted concepts:")
+for concept in output.data.concepts:
+    print("%s %.2f" % (concept.name, concept.value))
+
+# Uncomment this line to print the full Response JSON
+#print(output)
+```
+
+```javascript JavaScript (REST)
+<!--index.html file-->
+
+<script>
+    /////////////////////////////////////////////////////////////////////////////////////////////////////////
+    // In this section, we set the user authentication, user and app ID, model details, and the location
+    // of the text we want as an input. Change these strings to run your own example.
+    /////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    // Your PAT (Personal Access Token) can be found in the portal under Authentification
+    const PAT = 'YOUR_PAT_HERE';
+    // Specify the correct user_id/app_id pairings
+    // Since you're making inferences outside your app's scope
+    const USER_ID = 'nlptownres';    
+    const APP_ID = 'text-classification';
+    // Change these to whatever model and text input you want to use
+    const MODEL_ID = 'multilingual-uncased-sentiment';
+    const MODEL_VERSION_ID = '29d5fef0229a4936a607380d7ef775dd';    
+    const TEXT_FILE_BYTES = 'YOUR_TEXT_FILE_BYTES_HERE';
+
+    ///////////////////////////////////////////////////////////////////////////////////
+    // YOU DO NOT NEED TO CHANGE ANYTHING BELOW THIS LINE TO RUN THIS EXAMPLE
+    ///////////////////////////////////////////////////////////////////////////////////
+
+    const raw = JSON.stringify({
+        "user_app_id": {
+            "user_id": USER_ID,
+            "app_id": APP_ID
+        },
+        "inputs": [
+            {
+                "data": {
+                    "text": {
+                        "raw": TEXT_FILE_BYTES
+                    }
+                }
+            }
+        ]
+    });
+
+    const requestOptions = {
+        method: 'POST',
+        headers: {
+            'Accept': 'application/json',
+            'Authorization': 'Key ' + PAT
+        },
+        body: raw
+    };
+
+    // NOTE: MODEL_VERSION_ID is optional, you can also call prediction with the MODEL_ID only
+    // https://api.clarifai.com/v2/models/{YOUR_MODEL_ID}/outputs
+    // this will default to the latest version_id
+
+    fetch("https://api.clarifai.com/v2/models/" + MODEL_ID + "/versions/" + MODEL_VERSION_ID + "/outputs", requestOptions)
+        .then(response => response.text())
+        .then(result => console.log(result))
+        .catch(error => console.log('error', error));
+</script>
+```
+
+```nodejs NodeJs
+//index.js file
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////
+// In this section, we set the user authentication, user and app ID, model details, and the location
+// of the text we want as an input. Change these strings to run your own example.
+/////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// Your PAT (Personal Access Token) can be found in the portal under Authentification
+const PAT = 'YOUR_PAT_HERE';
+// Specify the correct user_id/app_id pairings
+// Since you're making inferences outside your app's scope
+const USER_ID = 'nlptownres';
+const APP_ID = 'text-classification';
+// Change these to whatever model and text input you want to use
+const MODEL_ID = 'multilingual-uncased-sentiment';
+const MODEL_VERSION_ID = '29d5fef0229a4936a607380d7ef775dd';
+const TEXT_FILE_LOCATION = 'YOUR_TEXT_FILE_LOCATION_HERE';
+
+///////////////////////////////////////////////////////////////////////////////////
+// YOU DO NOT NEED TO CHANGE ANYTHING BELOW THIS LINE TO RUN THIS EXAMPLE
+///////////////////////////////////////////////////////////////////////////////////
+
+const { ClarifaiStub, grpc } = require("clarifai-nodejs-grpc");
+
+const stub = ClarifaiStub.grpc();
+
+// This will be used by every Clarifai endpoint call
+const metadata = new grpc.Metadata();
+metadata.set("authorization", "Key " + PAT);
+
+const fs = require("fs");
+const fileBytes = fs.readFileSync(TEXT_FILE_LOCATION);
+
+stub.PostModelOutputs(
+    {
+        user_app_id: {
+            "user_id": USER_ID,
+            "app_id": APP_ID
+        },
+        model_id: MODEL_ID,
+        version_id: MODEL_VERSION_ID, // This is optional. Defaults to the latest model version
+        inputs: [
+            { data: { text: { raw: fileBytes } } }
+        ]
+    },
+    metadata,
+    (err, response) => {
+        if (err) {
+            throw new Error(err);
+        }
+
+        if (response.status.code !== 10000) {
+            throw new Error("Post model outputs failed, status: " + response.status.description);
+        }
+
+        // Since we have one input, one output will exist here
+        const output = response.outputs[0];
+
+        console.log("Predicted concepts:");
+        for (const concept of output.data.concepts) {
+            console.log(concept.name + " " + concept.value);
+        }
+    }
+
+);
+```
+
+```java Java
+package com.clarifai.example;
+
+import com.clarifai.grpc.api.*;
+import com.clarifai.channel.ClarifaiChannel;
+import com.clarifai.credentials.ClarifaiCallCredentials;
+import com.clarifai.grpc.api.status.StatusCode;
+import com.google.protobuf.ByteString;
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+
+public class ClarifaiExample {
+
+    /////////////////////////////////////////////////////////////////////////////////////////////////////////
+    // In this section, we set the user authentication, user and app ID, model details, and the location
+    // of the text we want as an input. Change these strings to run your own example.
+    /////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    //Your PAT (Personal Access Token) can be found in the portal under Authentication
+    static final String PAT = "YOUR_PAT_HERE";
+    // Specify the correct user_id/app_id pairings
+    // Since you're making inferences outside your app's scope
+    static final String USER_ID = "nlptownres";    
+    static final String APP_ID = "text-classification";
+    // Change these to whatever model and text input you want to use
+    static final String MODEL_ID = "multilingual-uncased-sentiment"; 
+     static final String MODEL_VERSION_ID = "29d5fef0229a4936a607380d7ef775dd";   
+    static final String TEXT_FILE_LOCATION = "YOUR_TEXT_FILE_LOCATION_HERE";
+   
+    ///////////////////////////////////////////////////////////////////////////////////
+    // YOU DO NOT NEED TO CHANGE ANYTHING BELOW THIS LINE TO RUN THIS EXAMPLE
+    ///////////////////////////////////////////////////////////////////////////////////	
+
+    public static void main(String[] args) throws IOException {
+
+        V2Grpc.V2BlockingStub stub = V2Grpc.newBlockingStub(ClarifaiChannel.INSTANCE.getGrpcChannel())
+            .withCallCredentials(new ClarifaiCallCredentials(PAT));
+
+        MultiOutputResponse postModelOutputsResponse = stub.postModelOutputs(
+            PostModelOutputsRequest.newBuilder()
+            .setUserAppId(UserAppIDSet.newBuilder().setUserId(USER_ID).setAppId(APP_ID))
+            .setModelId(MODEL_ID)
+            .setVersionId(MODEL_VERSION_ID) // This is optional. Defaults to the latest model version
+            .addInputs(
+                Input.newBuilder().setData(
+                    Data.newBuilder().setText(
+                        Text.newBuilder()
+                        .setRawBytes(ByteString.copyFrom(Files.readAllBytes(
+                            new File(TEXT_FILE_LOCATION).toPath()
+                        )))
+                    )
+                )
+            )
+            .build()
+        );
+
+        if (postModelOutputsResponse.getStatus().getCode() != StatusCode.SUCCESS) {
+            throw new RuntimeException("Post model outputs failed, status: " + postModelOutputsResponse.getStatus());
+        }
+
+        // Since we have one input, one output will exist here
+        Output output = postModelOutputsResponse.getOutputs(0);
+
+        System.out.println("Predicted concepts:");
+        for (Concept concept: output.getData().getConceptsList()) {
+            System.out.printf("%s %.2f%n", concept.getName(), concept.getValue());
+        }
+
+    }
+
+}
+```
+
+```php PHP
+<?php
+
+require __DIR__ . '/vendor/autoload.php';
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////
+// In this section, we set the user authentication, user and app ID, model details, and the location
+// of the text we want as an input. Change these strings to run your own example.
+////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// Your PAT (Personal Access Token) can be found in the portal under Authentification
+$PAT = 'YOUR_PAT_HERE';
+// Specify the correct user_id/app_id pairings
+// Since you're making inferences outside your app's scope
+$USER_ID = 'nlptownres';
+$APP_ID = 'text-classification';
+// Change these to whatever model and text URL you want to use
+$MODEL_ID = 'multilingual-uncased-sentiment';
+$MODEL_VERSION_ID = '29d5fef0229a4936a607380d7ef775dd';
+$TEXT_FILE_LOCATION = 'YOUR_TEXT_FILE_LOCATION_HERE';
+
+///////////////////////////////////////////////////////////////////////////////////
+// YOU DO NOT NEED TO CHANGE ANYTHING BELOW THIS LINE TO RUN THIS EXAMPLE
+///////////////////////////////////////////////////////////////////////////////////
+
+use Clarifai\ClarifaiClient;
+use Clarifai\Api\Data;
+use Clarifai\Api\Text;
+use Clarifai\Api\Input;
+use Clarifai\Api\PostModelOutputsRequest;
+use Clarifai\Api\Status\StatusCode;
+use Clarifai\Api\UserAppIDSet;
+
+$client = ClarifaiClient::grpc();
+
+$metadata = ['Authorization' => ['Key ' . $PAT ]];
+
+$userDataObject = new UserAppIDSet([
+    'user_id' => $USER_ID, 
+    'app_id' => $APP_ID 
+]);
+
+$textData = file_get_contents($TEXT_FILE_LOCATION); // Get the text bytes data from the location
+
+// Let's make a RPC call to the Clarifai platform. It uses the opened gRPC client channel to communicate a
+// request and then wait for the response
+[$response, $status] = $client->PostModelOutputs(
+    // The request object carries the request along with the request status and other metadata related to the request itself
+    new PostModelOutputsRequest([
+        'user_app_id' => $userDataObject,
+        'model_id' => $MODEL_ID,  
+        'version_id' => $MODEL_VERSION_ID, // This is optional. Defaults to the latest model version
+        'inputs' => [
+            new Input([ // The Input object wraps the Data object in order to meet the API specification                
+                'data' => new Data([ // The Data object is constructed around the Text object. It offers a container that has additional text independent
+                                    // metadata. In this particular use case, no other metadata is needed to be specified
+                    'text' => new Text([ // In the Clarifai platform, a text is defined by a special Text object
+                        'raw' => $textData 
+                    ])
+                ])
+            ])
+        ]        
+    ]),
+    $metadata
+)->wait();
+
+// A response is returned and the first thing we do is check the status of it
+// A successful response will have a status code of 0; otherwise, there is some error
+if ($status->code !== 0) {
+    throw new Exception("Error: {$status->details}");
+}
+
+// In addition to the RPC response status, there is a Clarifai API status that reports if the operation was a success or failure 
+// (not just that the communication was successful)
+if ($response->getStatus()->getCode() != StatusCode::SUCCESS) {
+    throw new Exception("Failure response: " . $response->getStatus()->getDescription() . " " .
+        $response->getStatus()->getDetails());
+}
+
+// The output of a successful call can be used in many ways. In this example, we loop through all of the predicted concepts and print them out along with
+// their numerical prediction value (confidence)
+echo "Predicted concepts: </br>";
+foreach ($response->getOutputs()[0]->getData()->getConcepts() as $concept) {
+    echo $concept->getName() . ": " . number_format($concept->getValue(), 2) . "</br>";
+}
+
+?>
+```
+
+```curl cURL
+# Smaller files (195 KB or less)
+
+curl -X POST "https://api.clarifai.com/v2/users/nlptownres/apps/text-classification/models/multilingual-uncased-sentiment/versions/29d5fef0229a4936a607380d7ef775dd/outputs" \
+    -H "Authorization: Key YOUR_PAT_HERE" \
+    -H "Content-Type: application/json" \
+    -d '{
+      "inputs": [
+        {
+          "data": {
+            "text": {
+              "raw": "YOUR_TEXT_FILE_BYTES_HERE"
+            }
+          }
+        }
+      ]
+    }'
+   
+```
+</CodeGroup>
+
+## Predict via Raw Text
+Below is an example of how you would provide raw text inputs and receive predictions from the [`multilingual-uncased-sentiment`](https://clarifai.com/nlptownres/text-classification/models/multilingual-uncased-sentiment) model.
+
+<CodeGroup>
+
+```python Python
+#########################################################################################################
+# In this section, we set the user authentication, user and app ID, model details, and the raw text
+# we want as an input. Change these strings to run your own example.
+########################################################################################################
+
+# Your PAT (Personal Access Token) can be found in the portal under Authentification
+PAT = 'YOUR_PAT_HERE'
+# Specify the correct user_id/app_id pairings
+# Since you're making inferences outside your app's scope
+USER_ID = 'nlptownres'
+APP_ID = 'text-classification'
+# Change these to whatever model and raw text you want to use
+MODEL_ID = 'multilingual-uncased-sentiment'
+MODEL_VERSION_ID = '29d5fef0229a4936a607380d7ef775dd'
+RAW_TEXT = 'I love your product very much'
+
+############################################################################
+# YOU DO NOT NEED TO CHANGE ANYTHING BELOW THIS LINE TO RUN THIS EXAMPLE
+############################################################################
+
+from clarifai_grpc.channel.clarifai_channel import ClarifaiChannel
+from clarifai_grpc.grpc.api import resources_pb2, service_pb2, service_pb2_grpc
+from clarifai_grpc.grpc.api.status import status_code_pb2
+
+channel = ClarifaiChannel.get_grpc_channel()
+stub = service_pb2_grpc.V2Stub(channel)
+
+metadata = (('authorization', 'Key ' + PAT),)
+
+userDataObject = resources_pb2.UserAppIDSet(user_id=USER_ID, app_id=APP_ID)
+
+post_model_outputs_response = stub.PostModelOutputs(
+    service_pb2.PostModelOutputsRequest(
+        user_app_id=userDataObject,  # The userDataObject is created in the overview and is required when using a PAT
+        model_id=MODEL_ID,
+        version_id=MODEL_VERSION_ID,  # This is optional. Defaults to the latest model version
+        inputs=[
+            resources_pb2.Input(
+                data=resources_pb2.Data(
+                    text=resources_pb2.Text(
+                        raw=RAW_TEXT
+                    )
+                )
+            )
+        ]
+    ),
+    metadata=metadata
+)
+if post_model_outputs_response.status.code != status_code_pb2.SUCCESS:
+    print(post_model_outputs_response.status)
+    raise Exception("Post model outputs failed, status: " + post_model_outputs_response.status.description)
+
+# Since we have one input, one output will exist here
+output = post_model_outputs_response.outputs[0]
+
+print("Predicted concepts:")
+for concept in output.data.concepts:
+    print("%s %.2f" % (concept.name, concept.value))
+
+# Uncomment this line to print the full Response JSON
+#print(output)
+```
+
+```javascript JavaScript
+<!--index.html file-->
+
+<script>
+    //////////////////////////////////////////////////////////////////////////////////////////////////////
+    // In this section, we set the user authentication, user and app ID, model details, and the raw
+    // text we want as an input. Change these strings to run your own example.
+    /////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    // Your PAT (Personal Access Token) can be found in the portal under Authentification
+    const PAT = 'YOUR_PAT_HERE';
+    // Specify the correct user_id/app_id pairings
+    // Since you're making inferences outside your app's scope
+    const USER_ID = 'nlptownres';   
+    const APP_ID = 'text-classification';
+    // Change these to whatever model and raw text you want to use
+    const MODEL_ID = 'multilingual-uncased-sentiment';
+    const MODEL_VERSION_ID = '29d5fef0229a4936a607380d7ef775dd';    
+    const RAW_TEXT = 'I love your product very much';
+
+    ///////////////////////////////////////////////////////////////////////////////////
+    // YOU DO NOT NEED TO CHANGE ANYTHING BELOW THIS LINE TO RUN THIS EXAMPLE
+    ///////////////////////////////////////////////////////////////////////////////////
+
+    const raw = JSON.stringify({
+        "user_app_id": {
+            "user_id": USER_ID,
+            "app_id": APP_ID
+        },
+        "inputs": [
+            {
+                "data": {
+                    "text": {
+                        "raw": RAW_TEXT
+                    }
+                }
+            }
+        ]
+    });
+
+    const requestOptions = {
+        method: 'POST',
+        headers: {
+            'Accept': 'application/json',
+            'Authorization': 'Key ' + PAT
+        },
+        body: raw
+    };
+
+    // NOTE: MODEL_VERSION_ID is optional, you can also call prediction with the MODEL_ID only
+    // https://api.clarifai.com/v2/models/{YOUR_MODEL_ID}/outputs
+    // this will default to the latest version_id
+
+    fetch("https://api.clarifai.com/v2/models/" + MODEL_ID + "/versions/" + MODEL_VERSION_ID + "/outputs", requestOptions)
+        .then(response => response.text())
+        .then(result => console.log(result))
+        .catch(error => console.log('error', error));
+</script>
+```
+
+```nodejs NodeJs
+//index.js file
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// In this section, we set the user authentication, user and app ID, model details, and the raw
+// text we want as an input. Change these strings to run your own example.
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// Your PAT (Personal Access Token) can be found in the portal under Authentification
+const PAT = 'YOUR_PAT_HERE';
+// Specify the correct user_id/app_id pairings
+// Since you're making inferences outside your app's scope
+const USER_ID = 'nlptownres';
+const APP_ID = 'text-classification';
+// Change these to whatever model and raw text you want to use
+const MODEL_ID = 'multilingual-uncased-sentiment';
+const MODEL_VERSION_ID = '29d5fef0229a4936a607380d7ef775dd';
+const RAW_TEXT = 'I love your product very much';
+
+///////////////////////////////////////////////////////////////////////////////////
+// YOU DO NOT NEED TO CHANGE ANYTHING BELOW THIS LINE TO RUN THIS EXAMPLE
+///////////////////////////////////////////////////////////////////////////////////
+
+const { ClarifaiStub, grpc } = require("clarifai-nodejs-grpc");
+
+const stub = ClarifaiStub.grpc();
+
+// This will be used by every Clarifai endpoint call
+const metadata = new grpc.Metadata();
+metadata.set("authorization", "Key " + PAT);
+
+stub.PostModelOutputs(
+    {
+        user_app_id: {
+            "user_id": USER_ID,
+            "app_id": APP_ID
+        },
+        model_id: MODEL_ID,
+        version_id: MODEL_VERSION_ID, // This is optional. Defaults to the latest model version
+        inputs: [
+            { data: { text: { raw: RAW_TEXT } } }
+        ]
+    },
+    metadata,
+    (err, response) => {
+        if (err) {
+            throw new Error(err);
+        }
+
+        if (response.status.code !== 10000) {
+            throw new Error("Post model outputs failed, status: " + response.status.description);
+        }
+
+        // Since we have one input, one output will exist here
+        const output = response.outputs[0];
+
+        console.log("Predicted concepts:");
+        for (const concept of output.data.concepts) {
+            console.log(concept.name + " " + concept.value);
+        }
+    }
+
+);
+```
+
+```java Java
+package com.clarifai.example;
+
+import com.clarifai.grpc.api.*;
+import com.clarifai.channel.ClarifaiChannel;
+import com.clarifai.credentials.ClarifaiCallCredentials;
+import com.clarifai.grpc.api.status.StatusCode;
+
+public class ClarifaiExample {
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////
+    // In this section, we set the user authentication, user and app ID, model details, and the raw
+    // text we want as an input. Change these strings to run your own example.
+    ///////////////////////////////////////////////////////////////////////////////////////////////////
+
+    //Your PAT (Personal Access Token) can be found in the portal under Authentication
+    static final String PAT = "YOUR_PAT_HERE";
+    // Specify the correct user_id/app_id pairings
+    // Since you're making inferences outside your app's scope
+    static final String USER_ID = "nlptownres";   
+    static final String APP_ID = "text-classification";
+    // Change these to whatever model and raw text you want to use
+    static final String MODEL_ID = "multilingual-uncased-sentiment";
+    static final String MODEL_VERSION_ID = "29d5fef0229a4936a607380d7ef775dd";    
+    static final String RAW_TEXT = "I love your product very much";    
+
+    ///////////////////////////////////////////////////////////////////////////////////
+    // YOU DO NOT NEED TO CHANGE ANYTHING BELOW THIS LINE TO RUN THIS EXAMPLE
+    ///////////////////////////////////////////////////////////////////////////////////	
+
+    public static void main(String[] args) {
+
+        V2Grpc.V2BlockingStub stub = V2Grpc.newBlockingStub(ClarifaiChannel.INSTANCE.getGrpcChannel())
+            .withCallCredentials(new ClarifaiCallCredentials(PAT));
+
+        MultiOutputResponse postModelOutputsResponse = stub.postModelOutputs(
+            PostModelOutputsRequest.newBuilder()
+            .setUserAppId(UserAppIDSet.newBuilder().setUserId(USER_ID).setAppId(APP_ID))
+            .setModelId(MODEL_ID)
+            .setVersionId(MODEL_VERSION_ID) // This is optional. Defaults to the latest model version
+            .addInputs(
+                Input.newBuilder().setData(
+                    Data.newBuilder().setText(
+                        Text.newBuilder().setRaw(RAW_TEXT)
+                    )
+                )
+            )
+            .build()
+        );
+
+        if (postModelOutputsResponse.getStatus().getCode() != StatusCode.SUCCESS) {
+            throw new RuntimeException("Post model outputs failed, status: " + postModelOutputsResponse.getStatus());
+        }
+
+        // Since we have one input, one output will exist here
+        Output output = postModelOutputsResponse.getOutputs(0);
+
+        System.out.println("Predicted concepts:");
+        for (Concept concept: output.getData().getConceptsList()) {
+            System.out.printf("%s %.2f%n", concept.getName(), concept.getValue());
+        }
+
+    }
+
+}
+```
+
+```php PHP
+<?php
+
+require __DIR__ . '/vendor/autoload.php';
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////
+// In this section, we set the user authentication, user and app ID, model details, and the raw
+// text we want as an input. Change these strings to run your own example.
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// Your PAT (Personal Access Token) can be found in the portal under Authentification
+$PAT = 'YOUR_PAT_HERE';
+// Specify the correct user_id/app_id pairings
+// Since you're making inferences outside your app's scope
+$USER_ID = 'nlptownres';
+$APP_ID = 'text-classification';
+// Change these to whatever model and raw text you want to use
+$MODEL_ID = 'multilingual-uncased-sentiment';
+$MODEL_VERSION_ID = '29d5fef0229a4936a607380d7ef775dd';
+$RAW_TEXT = 'I love your product very much';
+
+///////////////////////////////////////////////////////////////////////////////////
+// YOU DO NOT NEED TO CHANGE ANYTHING BELOW THIS LINE TO RUN THIS EXAMPLE
+///////////////////////////////////////////////////////////////////////////////////
+
+use Clarifai\ClarifaiClient;
+use Clarifai\Api\Data;
+use Clarifai\Api\Text;
+use Clarifai\Api\Input;
+use Clarifai\Api\PostModelOutputsRequest;
+use Clarifai\Api\Status\StatusCode;
+use Clarifai\Api\UserAppIDSet;
+
+$client = ClarifaiClient::grpc();
+
+$metadata = ['Authorization' => ['Key ' . $PAT ]];
+
+$userDataObject = new UserAppIDSet([
+    'user_id' => $USER_ID, 
+    'app_id' => $APP_ID 
+]);
+
+// Let's make a RPC call to the Clarifai platform. It uses the opened gRPC client channel to communicate a
+// request and then wait for the response
+[$response, $status] = $client->PostModelOutputs(
+    // The request object carries the request along with the request status and other metadata related to the request itself
+    new PostModelOutputsRequest([
+        'user_app_id' => $userDataObject,
+        'model_id' => $MODEL_ID,  
+        'version_id' => $MODEL_VERSION_ID, // This is optional. Defaults to the latest model version
+        'inputs' => [
+            new Input([ // The Input object wraps the Data object in order to meet the API specification                
+                'data' => new Data([ // The Data object is constructed around the Text object. It offers a container that has additional text independent
+                                    // metadata. In this particular use case, no other metadata is needed to be specified
+                    'text' => new Text([ // In the Clarifai platform, a text is defined by a special Text object
+                        'raw' => $RAW_TEXT 
+                    ])
+                ])
+            ])
+        ]        
+    ]),
+    $metadata
+)->wait();
+
+// A response is returned and the first thing we do is check the status of it
+// A successful response will have a status code of 0; otherwise, there is some error
+if ($status->code !== 0) {
+    throw new Exception("Error: {$status->details}");
+}
+
+// In addition to the RPC response status, there is a Clarifai API status that reports if the operation was a success or failure 
+// (not just that the communication was successful)
+if ($response->getStatus()->getCode() != StatusCode::SUCCESS) {
+    throw new Exception("Failure response: " . $response->getStatus()->getDescription() . " " .
+        $response->getStatus()->getDetails());
+}
+
+// The output of a successful call can be used in many ways. In this example, we loop through all of the predicted concepts and print them out along with
+// their numerical prediction value (confidence)
+echo "Predicted concepts: </br>";
+foreach ($response->getOutputs()[0]->getData()->getConcepts() as $concept) {
+    echo $concept->getName() . ": " . number_format($concept->getValue(), 2) . "</br>";
+}
+
+?>
+```
+
+```curl cURL
+curl -X POST "https://api.clarifai.com/v2/users/nlptownres/apps/text-classification/models/multilingual-uncased-sentiment/versions/29d5fef0229a4936a607380d7ef775dd/outputs" \
+    -H "Authorization: Key YOUR_PAT_HERE" \
+    -H "Content-Type: application/json" \
+    -d '{
+      "inputs": [
+        {
+          "data": {
+            "text": {
+              "raw": "I love your product very much"
+            }
+          }
+        }
+      ]
+    }'
+   
+```
+
+</CodeGroup>
+
+<Accordion title="Code Output Example">
+```
+Predicted concepts:
+5-stars 0.87
+4-stars 0.12
+3-stars 0.01
+1-star 0.00
+2-stars 0.00
+```
+</Accordion>
+
+<Accordion title="JSON Output Example">
+```json
+Predicted concepts:
+id: "9b7efc5d5e3d4d8da20faad4dc35dd8a"
+status {
+  code: SUCCESS
+  description: "Ok"
+}
+created_at {
+  seconds: 1676382425
+  nanos: 572796576
+}
+model {
+  id: "multilingual-uncased-sentiment"
+  name: "multilingual-uncased-sentiment"
+  created_at {
+    seconds: 1656469244
+    nanos: 44961000
+  }
+  app_id: "text-classification"
+  model_version {
+    id: "29d5fef0229a4936a607380d7ef775dd"
+    created_at {
+      seconds: 1656469244
+      nanos: 60443000
+    }
+    status {
+      code: MODEL_TRAINED
+      description: "Model is trained and ready"
+    }
+    visibility {
+      gettable: PUBLIC
+    }
+    app_id: "text-classification"
+    user_id: "nlptownres"
+    metadata {
+      fields {
+        key: "Model version logs zipped"
+        value {
+          string_value: "https://s3.amazonaws.com/clarifai-temp/prod/29d5fef0229a4936a607380d7ef775dd.zip"
+        }
+      }
+    }
+  }
+  user_id: "nlptownres"
+  model_type_id: "text-classifier"
+  visibility {
+    gettable: PUBLIC
+  }
+  modified_at {
+    seconds: 1661364520
+    nanos: 417454000
+  }
+  task: "text-classification"
+  presets {
+  }
+  workflow_recommended {
+  }
+}
+input {
+  id: "09633b75b0864a2792e635c5aa098614"
+  data {
+    text {
+      raw: "I love your product very much"
+      url: "https://samples.clarifai.com/placeholder.gif"
+    }
+  }
+}
+data {
+  concepts {
+    id: "5-stars"
+    name: "5-stars"
+    value: 0.866517961025238
+    app_id: "text-classification"
+  }
+  concepts {
+    id: "4-stars"
+    name: "4-stars"
+    value: 0.11985278874635696
+    app_id: "text-classification"
+  }
+  concepts {
+    id: "3-stars"
+    name: "3-stars"
+    value: 0.009703087620437145
+    app_id: "text-classification"
+  }
+  concepts {
+    id: "1-star"
+    name: "1-star"
+    value: 0.0020059270318597555
+    app_id: "text-classification"
+  }
+  concepts {
+    id: "2-stars"
+    name: "2-stars"
+    value: 0.001920199254527688
+    app_id: "text-classification"
+  }
+}
+```
+</Accordion>
